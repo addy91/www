@@ -1,0 +1,116 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+  <head>
+    <title>Temperatur erfasseng</title>
+    <meta http-equiv="expires" content="0">
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  </head>
+
+<body>
+
+<?php
+  $tabellenname = "temp"; //hier kannst du den tabellenname festlegen
+
+//datenbank öffnen
+  $dbname="dataLogger";        // Name der Datenban
+  $dbhost="localhost";         // Adresse des Datenbankservers, meist localhost
+  $dbuser="karl";              // Ihr MySQL Benutzername
+  $dbpass="2fast4y";           // Ihr MySQL Passwort
+  $connection = mysql_connect("$dbhost" , "$dbuser" , "$dbpass")
+               OR die ("Keine Verbindung zu der Datenbank moeglich.<br>".mysql_error());
+
+  $db = mysql_select_db($dbname , $connection)
+              OR die ("Auswahl der Datenbank nicht moeglich.<br>".mysql_error());
+
+// tabelle anlegen wenn sie noch nicht besteht
+// mysql_query("CREATE TABLE  IF NOT EXISTS $tabellenname (
+// id int(255) NOT NULL auto_increment,
+// datum DATE NOT NULL,
+// zeit TIME NOT NULL,
+// sensor_id varchar(16) NOT NULL,
+// sensor varchar(5) NOT NULL,
+// PRIMARY KEY (id) );") or die(mysql_error()) ;
+// Mit CREATE TABLE geben wir an, dass eine neue Tabelle erzeugt werden soll
+// IF NOT EXISTS ist dafuer zustaendig, dass die neue Tabelle nur erstellt wird,
+// wenn noch KEINE Tabelle mit der darauffolgenden Bezeichnung, in unserer aktiven DB, vorhanden ist
+
+
+$datei_sensor_anzahl = "/sys/devices/w1_bus_master1/w1_master_slave_count";
+$dateihandle1 = fopen($datei_sensor_anzahl, "r");
+$anzahl_sensoren_file = fread($dateihandle1, filesize($datei_sensor_anzahl)); //komplett einlesen
+$anzahl_sensoren_laenge = strlen($anzahl_sensoren_file);
+$anzahl_sensoren = substr($anzahl_sensoren_file, 0, $anzahl_sensoren_laenge-1);
+fclose($dateihandle1);
+// anzahl sensoren einlesen
+
+$datei_sensor_id = "/sys/devices/w1_bus_master1/w1_master_slaves";
+$dateihandle = fopen($datei_sensor_id, "r");
+$daten_sensor_id = fread($dateihandle, filesize($datei_sensor_id)); //komplett einlesen
+fclose($dateihandle);
+// daten sensor id,s einlesen
+
+$sensor_id = array();
+$count = 0;
+while($count < $anzahl_sensoren)
+{
+$sensor_id[$count] = substr($daten_sensor_id, $count*15+$count, 15);
+$count++;
+}
+// sensorID in array speichern
+
+$sensor = array();
+$count = 0;
+while($count < $anzahl_sensoren)
+{
+$thermometer_sensor_path = "/sys/bus/w1/devices/".$sensor_id[$count]."/w1_slave";
+// Open resource file for thermometer
+$thermometer = fopen($thermometer_sensor_path, "r");
+// Get the contents of the resource
+$thermometerReadings = fread($thermometer, filesize($thermometer_sensor_path));
+// Close resource file for thermometer
+fclose($thermometer);
+
+preg_match("/t=(.+)/",preg_split("/\n/", $thermometerReadings)[1], $matches);
+// preg_match() gibt 1 zurück, falls eine Übereinstimmung zwischen pattern und subject gefunden wurde, 0,
+// falls nicht oder FALSE, fall ein Fehler auftrat.
+
+$datum = date("Ymd");
+$zeit = date("His");
+$sensor[$count] = $matches[1];
+
+$query = "INSERT INTO $tabellenname (`datum`,`zeit`,`sensor_id`,`sensor`) VALUES ('$datum','$zeit','$sensor_id[$count]','$sensor[$count]')";
+if(mysql_query($query);
+{
+  echo "Eintrag ".$datum." ".$zeit." ".$sensor_id[$count]." ".$sensor[$count]." erfolgreich <br>";
+}
+else
+{
+  echo "Eintrag ".$datum." ".$zeit." ".$sensor_id[$count]." ".$sensor[$count]." Fehler! <br>";
+}
+
+//ausgaben zur fehlersuche
+echo "datum ".$datum."<br>";
+echo "zeit ".$zeit."<br>";
+echo "datei sensor_id ".$daten_sensor_id."<br>";
+echo "anzahl_sensoren ".$anzahl_sensoren."<br>";
+echo "sensor_id_".$count." ".$sensor_id[$count]."<br>";
+echo "thermometer_sensor_path ".$thermometer_sensor_path."<br>";
+print "ausgabe der files w1_slave ".$thermometerReadings."<br>";
+echo "count ".$count."<br>";
+echo "sensor".$count." ".$sensor[$count]."<br>";
+ $matches[1]; // enthält 25000 (temperatur in tauselstel crad)
+ $matches[0]; // ethält t=25000
+ $temperature = $matches[1] / 1000; // umrechnen der temperatur
+print "temperatur ".number_format($matches[1] /1000,1) . " °C<br>"; // umrechnen der temperatur
+echo "------------------------------------<br>";
+
+$count++;
+}
+
+
+mysql_close();
+
+?>
+
+</body>
+</html>
